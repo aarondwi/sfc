@@ -15,8 +15,6 @@ class TestZkSD(unittest.TestCase):
     zk_clients = [
       KazooClient(hosts = zk_hosts) 
       for i in range(number_of_clients)]
-    for zkc in zk_clients:
-      zkc.start()
     
     client_hostnames = [
       '127.0.0.1:700' + str(i)
@@ -31,6 +29,7 @@ class TestZkSD(unittest.TestCase):
     ZkSDs = [
       ZkServiceDiscovery(
         zk_clients[i],
+        "/",
         client_hostnames[i],
         partial(cb, client_hostnames[i]))
       for i in range(number_of_clients)
@@ -45,8 +44,13 @@ class TestZkSD(unittest.TestCase):
         len(client_hostnames)
       )
 
+    for zkc in ZkSDs:
+      self.assertTrue(zkc.still_valid())
+
     # disable one of them
+    # it should be invalid directly
     zk_clients[len(zk_clients)-1].stop()
+    self.assertFalse(ZkSDs[-1].still_valid())
 
     # give time for changes to propagate
     sleep(2)

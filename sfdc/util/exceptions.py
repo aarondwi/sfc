@@ -1,0 +1,2 @@
+class StateInvalidException(BaseException):
+  pass
