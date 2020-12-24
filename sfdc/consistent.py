@@ -1,12 +1,14 @@
 from binascii import crc32
 
+from sfdc.util.exceptions import LocateEmpty
+
 class Consistent(object):
   """
   Implementation of consistent hashing, used to have a deterministic position of all hosts
 
   Internally, this class is using binascii.crc32 to map host's position
 
-  This class' implementation is NOT thread-safe
+  This implementation is NOT thread-safe
   """
 
   def __init__(self, hosts = []):
@@ -37,7 +39,7 @@ class Consistent(object):
 
   def locate(self, target):
     if len(self._host_pos) == 0:
-      raise LookupError("no host available, can't match to anything")
+      raise LocateEmpty("no host available, can't match to anything")
     
     hashval = self.host_as_crc32(target)
     for host in self._host_pos:
@@ -48,7 +50,6 @@ class Consistent(object):
     # choose the first one, as the consistenthash basically rolls over
     return self._host_map[self._host_pos[0]]
      
-
   def remove(self, host):
     hashval = self.host_as_crc32(host)
     if hashval in self._host_map:
@@ -59,6 +60,11 @@ class Consistent(object):
     try:
       hashval = crc32(host.encode())
     except AttributeError as ae:
-      raise ValueError("host should implement `encode()` to bytes")
+      # just for better error message
+      raise AttributeError("host should implement `encode()` to bytes")
 
     return hashval
+
+  def reset_with_new(self, hosts):
+    self.clear()
+    self.add_many(hosts)

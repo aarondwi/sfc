@@ -28,11 +28,12 @@ class TestZkSD(unittest.TestCase):
 
     ZkSDs = [
       ZkServiceDiscovery(
-        zk_clients[i],
+        zc,
         "/",
-        client_hostnames[i],
-        partial(cb, client_hostnames[i]))
-      for i in range(number_of_clients)
+        ch,
+        partial(cb, ch))
+      for zc, ch in zip(
+        zk_clients, client_hostnames)
     ]
 
     # give time for clients to setup, etc

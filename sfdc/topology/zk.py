@@ -1,6 +1,7 @@
 import logging
 logging.basicConfig()
 from functools import partial
+from base64 import b64encode, b64decode
 
 from kazoo.client import KazooState
 from kazoo.exceptions import (
@@ -20,9 +21,6 @@ class ZkServiceDiscovery(object):
   Does not use anything specific, so can use sequential/gevent based handler easily 
   (just make sure your other codes are using the same)
 
-  Do NOT start the KazooClient passed to this implementation,
-  because it needs to add listener (to monitor connection)
-
   By default, it only removes `/zookeeper`, if any, just in case you are using root node. 
   (actually, you shouldn't)
 
@@ -40,15 +38,19 @@ class ZkServiceDiscovery(object):
     monitor_cb => callback function, after each hosts change
     """
     self._zk_client = zk_client
-    self._root_path = root_path
+    self._root_path = root_path if root_path[-1]=="/" else root_path+"/"
     self._this_host = this_host
     self._monitor_cb = monitor_cb
     self._is_valid = None
 
-    self._zk_client.add_listener(self._connection_monitor)
-    self._zk_client.start()
+    try:
+      self._zk_client.add_listener(self._connection_monitor)
+      self._zk_client.start()
+      self._zk_client.ensure_path(root_path)
+    except AttributeError:
+      # just for better error message
+      raise AttributeError("Do you pass a proper KazooClient object as zk_client?")
 
-    self._zk_client.ensure_path(root_path)
     self.register()
     self.monitor_current_hosts()
 
@@ -58,13 +60,14 @@ class ZkServiceDiscovery(object):
     so if node crashes, should be able to reconnect following the basic flow.
     But if only temporarily disconnected, but still exists, no need to throw error.
 
-    This function assumes no other instance have the same `host` (and it shouldn't actually)
+    This function assumes no other instance have the same `host` (and it shouldn't actually),
+    and is registered in base64 format (so it won't error because of encoding, etc).
+    But it will 
 
     no need to handle other errors, as if this function failed, it is preferable to just crash (no data either way)
     """
-    self._zk_client.create(
-      f"{self._root_path}/{self._this_host}", 
-      ephemeral = True)
+    host_as_b64 = b64encode(self._this_host.encode('utf8')).decode('utf8')
+    self._zk_client.create(f"{self._root_path}{host_as_b64}", ephemeral = True)
 
   def monitor_current_hosts(self, stat = None):
     """
@@ -92,6 +95,7 @@ class ZkServiceDiscovery(object):
     
     if self._root_path == "/":
       hosts.remove("zookeeper")
+    hosts = [b64decode(h.encode()).decode() for h in hosts]
     self._monitor_cb(hosts)
 
   def _connection_monitor(self, state):
