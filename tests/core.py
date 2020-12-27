@@ -3,11 +3,49 @@ from functools import partial
 from time import sleep
 from threading import Thread, Lock
 from socket import gethostname
+from urllib.parse import urlparse
 
 from kazoo.client import KazooClient
+import requests
+import waitress
 
-from sfdc.core import sfdc_consistent_zk
+from sfdc.core import SfdcCore
 from sfdc.consistent import Consistent
+from sfdc.topology.zk import ZkServiceDiscovery
+
+def sfdc_consistent_zk(
+  zk_client, 
+  root_path, 
+  this_host, 
+  fetching_fn):
+  """
+  all of these are usually set before anything else
+  and on main thread, when bootstrapping
+
+  this function is just for test's simplicity
+  """
+
+  def strip_scheme(url):
+    # taken from https://stackoverflow.com/questions/21687408/how-to-remove-scheme-from-url-in-python
+    parsed = urlparse(url)
+    scheme = "%s://" % parsed.scheme
+    return parsed.geturl().replace(scheme, '', 1)
+
+  wsgi_serve = partial(waitress.serve, listen=strip_scheme(this_host))
+
+  requests_conn_pool = requests.Session()
+  http_adapter = requests.adapters.HTTPAdapter(
+    pool_connections=10, pool_maxsize=100)
+  requests_conn_pool.mount('http://', http_adapter)
+
+  c = Consistent(hosts=[this_host])
+  zksd = ZkServiceDiscovery(
+    zk_client,
+    root_path,
+    this_host,
+    c.reset_with_new)
+
+  return SfdcCore(this_host, c, wsgi_serve, requests_conn_pool, fetching_fn)
 
 class TestSfdcCore(unittest.TestCase):
   def test_singlecall_over_network(self):
