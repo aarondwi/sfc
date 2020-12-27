@@ -36,12 +36,12 @@ class SfdcBackendServer(object):
       return
 
     try:
-      result = self._fn(key, params)
+      result = self._fn(key, params, force_this_node=True)
       resp.status = falcon.HTTP_OK
       resp.body = json.dumps(result)
     except Exception as e:
-      resp.status = falcon.HTTPInternalServerError
-      resp.body = e
+      resp.status = falcon.HTTP_INTERNAL_SERVER_ERROR
+      resp.body = str(e)
 
 class SfdcCore(object):
   """
@@ -86,7 +86,7 @@ class SfdcCore(object):
       daemon=True)
     self._backend_server_thread.start()
 
-  def fetch(self, key, params):
+  def fetch(self, key, params, force_this_node=False):
     """
     Key should be the first parameter
 
@@ -96,6 +96,10 @@ class SfdcCore(object):
     returning json map, so design your `fetching_fn` to return as json
 
     Any error coming from your function, will be directly raised back
+
+    the `force_this_node` parameter is used, to ensure that
+    if the service discovery is broken (network-partition, delay update, etc)
+    sfdc doesn't fall into loop calling each other until everything is used up
     """
     try:
       url = self._host_locator.locate(key)
@@ -103,7 +107,7 @@ class SfdcCore(object):
       # just for better error message
       raise AttributeError("`host_locator` should implement `locate()` method")
 
-    if self._this_host == url:
+    if force_this_node or (self._this_host == url):
       return self._sf.call(
         self._fn,
         key,
