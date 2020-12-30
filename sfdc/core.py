@@ -9,7 +9,7 @@ import falcon
 from singleflight.basic import SingleFlight
 
 from sfdc.consistent import Consistent
-from sfdc.topology.zk import ZkServiceDiscovery
+from sfdc.topology.zk import ZkDiscovery
 from sfdc.util.exceptions import SfdcFetchError
 
 class SfdcBackendServer(object):
@@ -44,18 +44,16 @@ class SfdcCore(object):
     wsgi_serve,
     requests_conn_pool,
     fetching_fn):
+    """ Create the main Sfdc object
+  
+    :param this_host: to check whether locator returning to this_host, if so, 
+      this instance will be the one to call `fetching_fn`
+    :param host_locator: object that has `locate()` method, may be static, dynamic, or whatever
+    :param wsgi_serve: a WSGI server, will be passed a `falcon.API()` object
+    :param requests: a `requests` module connection pool
+    :param fetching_fn: the function to call if this instance is the one to call main resource
     """
-    this_host => to check whether locator returning to this_host, if so, 
-    this instance will be the one to call `fetching_fn`. Notes, you should pass the scheme too
 
-    host_locator => object that has `locate()` method, may be static, dynamic, or whatever
-
-    wsgi_serve => a WSGI server, will be passed a `falcon.API()` object
-
-    requests => a `requests` module connection pool
-
-    fetching_fn => the function to call if this instance is the one to call main resource
-    """
     self._this_host = this_host
     self._host_locator = host_locator
     self._sf = SingleFlight()
@@ -72,19 +70,18 @@ class SfdcCore(object):
     self._backend_server_thread.start()
 
   def fetch(self, key, params, force_this_node=False):
-    """
-    Key should be the first parameter
+    """call `fn` only once, coalesced by key
 
-    params is a key-value (map), that will be translated to json,
+    :param key: a unique identifier, to coalesce same requests
+    :param params: a key-value (map), that will be translated to json,
     if requesting to another server
-
-    returning json map, so design your `fetching_fn` to return as json
+    :param force_this_node: ensure that
+    if the service discovery is broken (network-partition, delay update, etc)
+    sfdc doesn't fall into loop calling each other until everything is used up
 
     Any error coming from your function, will be directly raised back
 
-    the `force_this_node` parameter is used, to ensure that
-    if the service discovery is broken (network-partition, delay update, etc)
-    sfdc doesn't fall into loop calling each other until everything is used up
+    returning json map, so design your `fetching_fn` to return as json
     """
     try:
       url = self._host_locator.locate(key)

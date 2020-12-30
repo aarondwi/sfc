@@ -11,7 +11,7 @@ import waitress
 
 from sfdc.core import SfdcCore
 from sfdc.consistent import Consistent
-from sfdc.topology.zk import ZkServiceDiscovery
+from sfdc.topology.zk import ZkDiscovery
 
 def sfdc_consistent_zk(
   zk_client, 
@@ -39,7 +39,7 @@ def sfdc_consistent_zk(
   requests_conn_pool.mount('http://', http_adapter)
 
   c = Consistent(hosts=[this_host])
-  zksd = ZkServiceDiscovery(
+  zksd = ZkDiscovery(
     zk_client,
     root_path,
     this_host,

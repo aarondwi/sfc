@@ -4,7 +4,7 @@ from time import sleep
 
 from kazoo.client import KazooClient
 
-from sfdc.topology.zk import ZkServiceDiscovery
+from sfdc.topology.zk import ZkDiscovery
 
 class TestZkSD(unittest.TestCase):
   def test_main_flow(self):
@@ -27,10 +27,8 @@ class TestZkSD(unittest.TestCase):
       client_map[client_hostname] = len(hosts)
 
     ZkSDs = [
-        ZkServiceDiscovery(zc, "/", ch,
-        partial(cb, ch))
-      for zc, ch in zip(
-        zk_clients, client_hostnames)
+      ZkDiscovery(zc, "/", ch, partial(cb, ch))
+      for zc, ch in zip(zk_clients, client_hostnames)
     ]
 
     # give time for clients to setup, etc
@@ -47,7 +45,8 @@ class TestZkSD(unittest.TestCase):
 
     # disable one of them
     # it should be invalid directly
-    zk_clients[len(zk_clients)-1].stop()
+    # zk_clients[len(zk_clients)-1].stop()
+    ZkSDs[-1].stop(stop_zk_client=True)
     self.assertFalse(ZkSDs[-1].still_valid())
 
     # give time for changes to propagate
