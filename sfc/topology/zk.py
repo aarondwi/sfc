@@ -99,18 +99,17 @@ class ZkDiscovery(object):
       if not self.participating:
         return
 
-      hosts = self._zk_client.retry(
-          self._zk_client.get_children, self._root_path)
-      if self._root_path == "/":
-        hosts.remove("zookeeper")
-      hosts = [b64decode(h.encode()).decode() for h in hosts]
-      self._monitor_cb(hosts)
-
       try:
-        self._zk_client.retry(
+        hosts = self._zk_client.retry(
           self._zk_client.get_children,
           self._root_path,
           watch=self._watch_monitor)
+
+        if self._root_path == "/":
+          hosts.remove("zookeeper")
+        hosts = [b64decode(h.encode()).decode() for h in hosts]
+        self._monitor_cb(hosts)
+        
       except NoNodeError:
         self.participating = False
         logger.error("Base root gone, can't continue monitoring for change", exc_info=1)
