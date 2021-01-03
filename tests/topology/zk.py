@@ -27,7 +27,7 @@ class TestZkSD(unittest.TestCase):
       client_map[client_hostname] = len(hosts)
 
     ZkSDs = [
-      ZkDiscovery(zc, "/", ch, partial(cb, ch))
+      ZkDiscovery(zc, "/", ch, partial(cb, ch), 1)
       for zc, ch in zip(zk_clients, client_hostnames)
     ]
 

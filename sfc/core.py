@@ -39,6 +39,13 @@ class SfcCore(object):
   """
   Coalese/Dedup multiple call with the same coalesce `key`, into one,
   in distributed system setup
+
+  :param this_host: to check whether locator returning to this_host, if so, 
+      this instance will be the one to call `fetching_fn`
+  :param host_locator: object that has `locate()` method, may be static, dynamic, or whatever
+  :param wsgi_serve: a WSGI server, will be passed a `falcon.API()` object
+  :param requests: a `requests` module connection pool
+  :param fetching_fn: the function to call if this instance is the one to call main resource
   """
   def __init__(
     self,
@@ -47,15 +54,6 @@ class SfcCore(object):
     wsgi_serve,
     requests_conn_pool,
     fetching_fn):
-    """ Create the main Sfc object
-  
-    :param this_host: to check whether locator returning to this_host, if so, 
-      this instance will be the one to call `fetching_fn`
-    :param host_locator: object that has `locate()` method, may be static, dynamic, or whatever
-    :param wsgi_serve: a WSGI server, will be passed a `falcon.API()` object
-    :param requests: a `requests` module connection pool
-    :param fetching_fn: the function to call if this instance is the one to call main resource
-    """
 
     self._this_host = this_host
     self._host_locator = host_locator

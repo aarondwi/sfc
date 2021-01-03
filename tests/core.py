@@ -43,7 +43,8 @@ def sfc_consistent_zk(
     zk_client,
     root_path,
     this_host,
-    c.reset_with_new)
+    c.reset_with_new,
+    1)
 
   return SfcCore(this_host, c, wsgi_serve, requests_conn_pool, fetching_fn)
 

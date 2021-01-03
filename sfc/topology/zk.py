@@ -1,6 +1,8 @@
 from threading import Thread
 from base64 import b64encode, b64decode
 from functools import partial
+import random
+from time import sleep
 import logging
 logger = logging.getLogger(__name__)
 
@@ -23,22 +25,28 @@ class ZkDiscovery(object):
   By default, it only removes `/zookeeper`, if any, just in case you are using root node. 
   (actually, you shouldn't)
 
-  this implementation does not use lock internally, because kazoo
+  this implementation does not use lock internally, as kazoo
   guarantee only 1 thread managing the watchers
+
+  :param zk_client: Kazoo connection to be used
+  :param root_path: path to put this consistenthashing's config (use preceding '/')
+  :param this host: this instance's hostname, that is also used for (no need for preceding '/')
+  :param monitor_cb: callback function, after each hosts change
+  :param jitter_range: do call zk after some jitter sleep, to reduce herd
   """
 
-  def __init__(self, zk_client, root_path, this_host, monitor_cb):
-    """Create a service discovery object from Zookeeper
+  def __init__(self, zk_client, root_path, this_host, monitor_cb, jitter_range):
     
-    :param zk_client: Kazoo connection to be used
-    :param root_path: path to put this consistenthashing's config (use preceding '/')
-    :param this host: this instance's hostname, that is also used for (no need for preceding '/')
-    :param monitor_cb: callback function, after each hosts change
-    """
     self._zk_client = zk_client
     self._root_path = root_path if root_path[-1] == "/" else root_path+"/"
     self._this_host = this_host
     self._monitor_cb = monitor_cb
+    
+    self._jitter_range = jitter_range
+    if self._jitter_range and self._jitter_range <= 0:
+      # allow negative param, but reset it to default value
+      self._jitter_range = 5
+    
     self.participating = False
 
     try:
@@ -99,6 +107,12 @@ class ZkDiscovery(object):
       if not self.participating:
         return
 
+      # we sleep for a bit, for random duration
+      # until self._jitter_range
+      #
+      # this is done to prevent herd call after each membership change
+      self._jittered_sleep()
+
       try:
         hosts = self._zk_client.retry(
           self._zk_client.get_children,
@@ -109,7 +123,7 @@ class ZkDiscovery(object):
           hosts.remove("zookeeper")
         hosts = [b64decode(h.encode()).decode() for h in hosts]
         self._monitor_cb(hosts)
-        
+
       except NoNodeError:
         self.participating = False
         logger.error("Base root gone, can't continue monitoring for change", exc_info=1)
@@ -152,3 +166,6 @@ class ZkDiscovery(object):
     except NoNodeError:
       return False
     return True
+
+  def _jittered_sleep(self):
+    sleep(random.uniform(0, self._jitter_range))
