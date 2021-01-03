@@ -1,5 +1,5 @@
-# sfdc
-Distributed implementation of singleflight, written in python
+# sfc
+Implementation of singleflight-cluster.
 
 By default, it uses consistent hashing on top of [zookeeper](https://zookeeper.apache.org/) + [kazoo](https://github.com/python-zk/kazoo) to handle service discovery
 and use [falcon](https://falconframework.org/) web framework for backend server.

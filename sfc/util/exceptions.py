@@ -1,9 +1,9 @@
 class StateInvalidException(BaseException):
   pass
 
-class SfdcFetchError(BaseException):
+class SfcFetchError(BaseException):
   """
-  Thrown when sfdc failed to fetch from proper host in consistent
+  Thrown when sfc failed to fetch from proper host in consistent
   """
   pass
 

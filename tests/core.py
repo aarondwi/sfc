@@ -9,11 +9,11 @@ from kazoo.client import KazooClient
 import requests
 import waitress
 
-from sfdc.core import SfdcCore
-from sfdc.consistent import Consistent
-from sfdc.topology.zk import ZkDiscovery
+from sfc.core import SfcCore
+from sfc.consistent import Consistent
+from sfc.topology.zk import ZkDiscovery
 
-def sfdc_consistent_zk(
+def sfc_consistent_zk(
   zk_client, 
   root_path, 
   this_host, 
@@ -45,9 +45,9 @@ def sfdc_consistent_zk(
     this_host,
     c.reset_with_new)
 
-  return SfdcCore(this_host, c, wsgi_serve, requests_conn_pool, fetching_fn)
+  return SfcCore(this_host, c, wsgi_serve, requests_conn_pool, fetching_fn)
 
-class TestSfdcCore(unittest.TestCase):
+class TestSfcCore(unittest.TestCase):
   def test_singlecall_over_network(self):
     print(f"Running test: `test_singlecall_over_network`")
 
@@ -72,7 +72,7 @@ class TestSfdcCore(unittest.TestCase):
     sc = []
     for host, zc in zip(hosts, zk_clients):
       sc.append(
-        sfdc_consistent_zk(
+        sfc_consistent_zk(
           zk_client=zc,
           root_path="/",
           this_host=host,
@@ -133,7 +133,7 @@ class TestSfdcCore(unittest.TestCase):
     sc = []
     for host, zc in zip(hosts, zk_clients):
       sc.append(
-        sfdc_consistent_zk(
+        sfc_consistent_zk(
           zk_client=zc,
           root_path="/",
           this_host=host,

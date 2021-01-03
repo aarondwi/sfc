@@ -1,16 +1,17 @@
-from sfdc.util.exceptions import StateInvalidException
+from threading import Thread
+from base64 import b64encode, b64decode
+from functools import partial
+import logging
+logger = logging.getLogger(__name__)
+
 from kazoo.exceptions import (
     NoNodeError,
     NodeExistsError,
     KazooException
 )
 from kazoo.client import KazooState
-from threading import Thread
-from base64 import b64encode, b64decode
-from functools import partial
-import logging
-logging.basicConfig()
 
+from sfc.util.exceptions import StateInvalidException
 
 class ZkDiscovery(object):
   """
@@ -76,7 +77,10 @@ class ZkDiscovery(object):
     try:
       self._zk_client.create(self._this_host_full_path(), ephemeral=True)
     except NodeExistsError:
-      pass
+      logger.warn(
+        "Node exists error found,"
+        "meaning some interruption to network/node happened."
+        "Check if any of your apps are affected")
 
   def monitor_current_hosts(self):
     """
@@ -109,12 +113,14 @@ class ZkDiscovery(object):
           watch=self._watch_monitor)
       except NoNodeError:
         self.participating = False
+        logger.error("Base root gone, can't continue monitoring for change", exc_info=1)
         raise StateInvalidException(
             "Base root gone, can't continue monitoring for change")
       except KazooException:
         # mostly will be about disconnected from server
         # meaning we can't safely continue running this instance forever
         # for now, just disable this instance
+        logger.error("Found un-handled kazoo exception:", exc_info=1)
         self.participating = False
         return
       else:

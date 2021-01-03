@@ -1,6 +1,6 @@
 from binascii import crc32
 
-from sfdc.util.exceptions import LocateEmpty
+from sfc.util.exceptions import LocateEmpty
 
 class Consistent(object):
   """

@@ -9,7 +9,7 @@ setup(
     long_description_content_type="text/markdown",
     keywords=['cache', 'stampede', 'thundering-herd', 'distributed', 'consistent-hash'],
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3.5',
@@ -27,7 +27,7 @@ setup(
     author_email='aarondwico@gmail.com',
     maintainer_email='aarondwico@gmail.com',
     url='http://github.com/aarondwi/sfdc',
-    packages=["sfdc",],
+    packages=["sfc",],
     install_requires=[],
     include_package_data=True,
     zip_safe=False,

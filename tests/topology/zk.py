@@ -4,7 +4,7 @@ from time import sleep
 
 from kazoo.client import KazooClient
 
-from sfdc.topology.zk import ZkDiscovery
+from sfc.topology.zk import ZkDiscovery
 
 class TestZkSD(unittest.TestCase):
   def test_main_flow(self):

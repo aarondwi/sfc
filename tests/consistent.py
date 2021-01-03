@@ -1,8 +1,8 @@
 import unittest
 from functools import partial
 
-from sfdc.consistent import Consistent
-from sfdc.util.exceptions import LocateEmpty
+from sfc.consistent import Consistent
+from sfc.util.exceptions import LocateEmpty
 
 class TestConsistent(unittest.TestCase):
   def test_main_flow(self):

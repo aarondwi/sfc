@@ -2,4 +2,3 @@ falcon
 kazoo
 singleflight
 requests
-waitress

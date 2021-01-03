@@ -5,14 +5,17 @@ Basic implementation of distributed singleflight in python
 from threading import Thread
 import json
 from json.decoder import JSONDecodeError
+import logging
+logger = logging.getLogger(__name__)
+
 import falcon
 from singleflight.basic import SingleFlight
 
-from sfdc.consistent import Consistent
-from sfdc.topology.zk import ZkDiscovery
-from sfdc.util.exceptions import SfdcFetchError
+from sfc.consistent import Consistent
+from sfc.topology.zk import ZkDiscovery
+from sfc.util.exceptions import SfcFetchError
 
-class SfdcBackendServer(object):
+class SfcBackendServer(object):
   def __init__(self, fn):
     self._fn = fn
 
@@ -32,7 +35,7 @@ class SfdcBackendServer(object):
       resp.status = falcon.HTTP_INTERNAL_SERVER_ERROR
       resp.body = str(e)
 
-class SfdcCore(object):
+class SfcCore(object):
   """
   Coalese/Dedup multiple call with the same coalesce `key`, into one,
   in distributed system setup
@@ -44,7 +47,7 @@ class SfdcCore(object):
     wsgi_serve,
     requests_conn_pool,
     fetching_fn):
-    """ Create the main Sfdc object
+    """ Create the main Sfc object
   
     :param this_host: to check whether locator returning to this_host, if so, 
       this instance will be the one to call `fetching_fn`
@@ -62,7 +65,7 @@ class SfdcCore(object):
 
     # backend Server
     api = falcon.API()
-    api.add_route("/{key}", SfdcBackendServer(self.fetch))
+    api.add_route("/{key}", SfcBackendServer(self.fetch))
     self._backend_server_thread = Thread(
       target=wsgi_serve, 
       args=(api,), 
@@ -77,7 +80,7 @@ class SfdcCore(object):
     if requesting to another server
     :param force_this_node: ensure that
     if the service discovery is broken (network-partition, delay update, etc)
-    sfdc doesn't fall into loop calling each other until everything is used up
+    sfc doesn't fall into loop calling each other until everything is used up
 
     Any error coming from your function, will be directly raised back
 
@@ -95,7 +98,9 @@ class SfdcCore(object):
         key,
         params=params)
 
+    logger.info(f"calling key `{key}` on {url}")
     resp = self._requests.post(f"{url}/{key}", json = json.dumps(params))
     if resp.status_code != 200:
-      raise SfdcFetchError(f"Failed to fetch data from {url}")
+      logger.warning("Failed calling {url}, receiving status code {resp.status_code}")
+      raise SfcFetchError(f"Failed to fetch data from {url}")
     return resp.json()
