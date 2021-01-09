@@ -81,7 +81,7 @@ class TestSfcCore(unittest.TestCase):
       ))
 
     # give time for clients to setup
-    sleep(3)
+    sleep(2)
 
     key = "test-key-for-unit-testing"
     params = {"val": 1}
