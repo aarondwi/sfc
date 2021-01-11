@@ -13,12 +13,6 @@ believing the other is still the rightful owner.
 This approach works because zookeeper will return a snapshot of instances, in which the requested node
 might be the rightful owner of the key, one time in the past.
 
-If disconnected from zookeeper for too long (in kazoo term, `SUSPENDED` or `LOST`), after a specified `disconnected_timeout` (default 60s), the instance gonna crash
+If disconnected from zookeeper for too long (in kazoo term, `SUSPENDED` or `LOST`), after a specified `disconnected_timeout` (default 60s), the instance will no longer be valid and start rejecting request, to prevent further membership drifting
 
 See [tests/core.py](https://github.com/aarondwi/sfdc/blob/main/tests/core.py) for example on how to initialize and use this implementation.
-
-## TODO
----------------------------------------------------
-
-1. Handle case disconnected from topology for too long (kill?)
-2. Add proper logging

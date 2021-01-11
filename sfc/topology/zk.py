@@ -39,7 +39,7 @@ class ZkDiscovery(object):
   :param disconnected_timeout: timeout to kill this instance after specified timeout, to prevent it from drifting even further
   """
 
-  def __init__(self, zk_client, root_path, this_host, monitor_cb, jitter_range, disconnected_timeout=60):
+  def __init__(self, zk_client, root_path, this_host, monitor_cb, jitter_range=5, disconnected_timeout=60):
     
     self._zk_client = zk_client
     self._root_path = root_path if root_path[-1] == "/" else root_path+"/"
@@ -47,12 +47,15 @@ class ZkDiscovery(object):
     self._monitor_cb = monitor_cb
     self._disconnected_timeout = disconnected_timeout
 
+    # allow negative value, but reset it to default
     self._jitter_range = jitter_range
-    if self._jitter_range and self._jitter_range <= 0:
-      # allow negative param, but reset it to default value
+    if self._jitter_range <= 0:
       self._jitter_range = 5
+    self._disconnected_timeout = disconnected_timeout
+    if self._disconnected_timeout <= 0:
+      self._disconnected_timeout = 60
     
-    self.previous_state = KazooState.LOST
+    self.current_state = KazooState.LOST
     self.participating = False
     self.participation_lock = zk_client.handler.lock_object()
     self.host_change_event = zk_client.handler.event_object()
@@ -62,7 +65,14 @@ class ZkDiscovery(object):
     try:
       self._zk_client.add_listener(self._connection_monitor)
       self._zk_client.start()
-      self._zk_client.ensure_path(root_path)
+
+      # we are doing below manually
+      # because on testing, found that 
+      # kazoo's `ensure_path` sometimes fail silently
+      try:
+        self._zk_client.create(root_path)
+      except NodeExistsError:
+        pass
     except AttributeError:
       # just for better error message
       raise AttributeError(
@@ -79,10 +89,11 @@ class ZkDiscovery(object):
   def _monitor_join(self):
     # after join returns, we can be sure that it succeeds
     result = self._join()
-    if result:
-      with self.participation_lock:
+    with self.participation_lock:
+      if result:
         self.participating = True
-        self.current_register_state = False
+        logger.info(f"{self._this_host} successfully join!")
+      self.current_register_state = False
 
   def _join(self):
     return self._zk_client.retry(self._inner_join)
@@ -102,12 +113,13 @@ class ZkDiscovery(object):
       self._zk_client.create(self._this_host_full_path(), ephemeral=True)
       return True
     except NodeExistsError:
-      logger.warn(
+      logger.warning(
         "Node exists error found,"
         "meaning some interruption to network/node happened."
         "Check if any of your apps are affected")
       return True
-    except KazooException:
+    except KazooException as e:
+      logger.info(f"{self._this_host} found another kazoo error when registering membership", exc_info=1)
       return False
 
   def _monitor_current_hosts(self):
@@ -143,7 +155,7 @@ class ZkDiscovery(object):
           self._monitor_cb(hosts)
 
         except NoNodeError:
-          with participation_lock:
+          with self.participation_lock:
             self.participating = False
           logger.error("Base root gone, can't continue monitoring for change", exc_info=1)
           raise StateInvalidException(
@@ -163,10 +175,12 @@ class ZkDiscovery(object):
   def _watch_monitor(self, stat=None):
     self.host_change_event.set()
 
-  def _connection_monitor(self, state):
+  def _connection_monitor(self, new_state):
     with self.participation_lock:
-      if (state == KazooState.CONNECTED 
-        and self.previous_state == KazooState.LOST
+      # we do not change the participating flag here
+      # need to ensure whether already connected or disconnected
+      if (new_state == KazooState.CONNECTED 
+        and self.current_state == KazooState.LOST
         and not self.current_register_state):
         logger.info(f"{self._this_host} trying to join right now")
         # because our membership use ephemeral node,
@@ -175,26 +189,26 @@ class ZkDiscovery(object):
         #
         # self.current_register_state is a barrier
         # to ensure only one thread to join is running
-        #
-        # we do not change the participating flag here
-        # because need to successfully register first before re-running
         self.current_register_state = True
-        Thread(target=self._monitor_join, daemon=True).start()
+        Thread(target=self._monitor_join).start()
     
-      if state != KazooState.CONNECTED:
-        self.participating = False
-        if not not self.currently_watch_disconnect:
+      if new_state != KazooState.CONNECTED:
+        if not self.currently_watch_disconnect:
           self.currently_watch_disconnect = True
-          Thread(target=self._monitor_kill_instance, daemon=True).start()
-        logger.info(f"{self._this_host} is currently disconnected")
+          Thread(target=self._monitor_kill_instance).start()
 
-      self.previous_state = state
+      self.current_state = new_state
 
   def still_valid(self):
     """
     returns whether this instance still valid (still connected, can manage its quorum via zk)
+
+    There may be a bit of time, after connected back to zk,
+    and for the list to be updated. 
+    But this is okay, as we only guarantee eventual consistency (we do not disable this instance directly after losing connection)
     """
-    return self.participating
+    with self.participation_lock:
+      return self.participating
 
   def stop(self, stop_zk_client=False):
     with self.participation_lock:
@@ -208,17 +222,18 @@ class ZkDiscovery(object):
   def _inner_stop(self):
     try:
       self._zk_client.delete(self._this_host_full_path())
-    except NoNodeError:
+    except KazooException:
       pass
 
   def _jittered_sleep(self):
     sleep(random.uniform(0, self._jitter_range))
 
   def _monitor_kill_instance(self):
+    logger.info(f"{self._this_host} is currently disconnected, waiting before stop participating")
     sleep(self._disconnected_timeout)
-    with participation_lock:
+    with self.participation_lock:
       self.currently_watch_disconnect = False
-      if not self.participating:
+      if self.current_state != KazooState.CONNECTED:
         # still not participating
         # meaning has been disconnected for too long
-        raise DisconnectedTooLongError()
+        self.participating = False
