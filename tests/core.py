@@ -13,7 +13,31 @@ from sfc.core import SfcCore
 from sfc.consistent import Consistent
 from sfc.topology.zk import ZkDiscovery
 
-def sfc_consistent_zk(
+class ZkConsistent(object):
+  def __init__(
+    self,
+    zk_client, 
+    root_path, 
+    this_host,
+    jitter_range=1,
+    disconnected_timeout=60):
+
+    self._consistent = Consistent(hosts=[this_host])
+    self._zksd = ZkDiscovery(
+      zk_client,
+      root_path,
+      this_host,
+      self._consistent.reset_with_new,
+      jitter_range,
+      disconnected_timeout)
+
+  def locate(self, key):
+    return self._consistent.locate(key)
+
+  def still_valid(self):
+    return self._zksd.still_valid()
+
+def create_sfc_consistent_zk(
   zk_client, 
   root_path, 
   this_host, 
@@ -38,15 +62,8 @@ def sfc_consistent_zk(
     pool_connections=10, pool_maxsize=100)
   requests_conn_pool.mount('http://', http_adapter)
 
-  c = Consistent(hosts=[this_host])
-  zksd = ZkDiscovery(
-    zk_client,
-    root_path,
-    this_host,
-    c.reset_with_new,
-    1)
-
-  return SfcCore(this_host, c, wsgi_serve, requests_conn_pool, fetching_fn)
+  zkc = ZkConsistent(zk_client, root_path, this_host)
+  return SfcCore(this_host, zkc, wsgi_serve, requests_conn_pool, fetching_fn)
 
 class TestSfcCore(unittest.TestCase):
   def test_singlecall_over_network(self):
@@ -73,7 +90,7 @@ class TestSfcCore(unittest.TestCase):
     sc = []
     for host, zc in zip(hosts, zk_clients):
       sc.append(
-        sfc_consistent_zk(
+        create_sfc_consistent_zk(
           zk_client=zc,
           root_path="/",
           this_host=host,
@@ -105,7 +122,8 @@ class TestSfcCore(unittest.TestCase):
       t.start()
       ts.append(t)
 
-    [t.join() for t in ts]
+    for t in ts:
+      t.join()
     self.assertEqual(cb_counter, 1)
 
     for zkc in zk_clients:
@@ -134,7 +152,7 @@ class TestSfcCore(unittest.TestCase):
     sc = []
     for host, zc in zip(hosts, zk_clients):
       sc.append(
-        sfc_consistent_zk(
+        create_sfc_consistent_zk(
           zk_client=zc,
           root_path="/",
           this_host=host,
@@ -159,7 +177,8 @@ class TestSfcCore(unittest.TestCase):
       t.start()
       ts.append(t)
 
-    [t.join() for t in ts]
+    for t in ts:
+      t.join()
     self.assertEqual(cb_counter, 3)
 
     for zkc in zk_clients:

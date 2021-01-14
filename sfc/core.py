@@ -13,7 +13,10 @@ from singleflight.basic import SingleFlight
 
 from sfc.consistent import Consistent
 from sfc.topology.zk import ZkDiscovery
-from sfc.util.exceptions import SfcFetchError
+from sfc.util.exceptions import (
+  FetchError,
+  ListNotValidError
+)
 
 class SfcBackendServer(object):
   def __init__(self, fn):
@@ -84,6 +87,9 @@ class SfcCore(object):
 
     returning json map, so design your `fetching_fn` to return as json
     """
+    if not self._host_locator.still_valid():
+      raise ListNotValidError()
+
     try:
       url = self._host_locator.locate(key)
     except AttributeError:
@@ -100,5 +106,5 @@ class SfcCore(object):
     resp = self._requests.post(f"{url}/{key}", json = json.dumps(params))
     if resp.status_code != 200:
       logger.warning("Failed calling {url}, receiving status code {resp.status_code}")
-      raise SfcFetchError(f"Failed to fetch data from {url}")
+      raise FetchError(f"Failed to fetch data from {url}")
     return resp.json()

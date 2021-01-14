@@ -103,7 +103,7 @@ class TestZkSD(unittest.TestCase):
     self.assertFalse(ZkSD.still_valid())
 
     # cleanup
-    ZkSD.stop(stop_zk_client=False)
+    ZkSD.stop(stop_zk_client=True)
     zk_client.delete("/sfc", recursive=True)
     zk_client.stop()
     sleep(1)
@@ -124,6 +124,11 @@ class TestZkSD(unittest.TestCase):
 
     self.assertEqual(ZkSD._jitter_range, 5)
     self.assertEqual(ZkSD._disconnected_timeout, 60)
+
+    # cleanup
+    ZkSD.stop(stop_zk_client=True)
+    zk_client.delete("/sfc",recursive=True)
+    sleep(2)
 
   def test_node_no_longer_exist(self):
     print("\ntest_node_no_longer_exist\n")

@@ -14,8 +14,7 @@ from kazoo.exceptions import (
 from kazoo.client import KazooState
 
 from sfc.util.exceptions import (
-  StateInvalidException,
-  DisconnectedTooLongError
+  StateInvalidException
 )
 
 class ZkDiscovery(object):
@@ -151,7 +150,7 @@ class ZkDiscovery(object):
 
           if self._root_path == "/":
             hosts.remove("zookeeper")
-          hosts = [b64decode(h.encode()).decode() for h in hosts]
+          hosts = [b64decode(h.encode('utf8')).decode('utf8') for h in hosts]
           self._monitor_cb(hosts)
 
         except NoNodeError:
